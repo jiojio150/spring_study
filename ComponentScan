@@ -1,0 +1,178 @@
+package hello.core;
+
+import hello.core.member.MemberRepository;
+import hello.core.member.MemoryMemberRepository;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+
+@Configuration
+//@Component가 붙은 모든 클래스를 자동으로 스프링 빈으로 듣록해줌.
+@ComponentScan(
+        //hello.core 패키지부터 하위로 컴포넌트 스캔을 하는 것.
+        basePackages = "hello.core",
+
+        //AutoAppConfig.class가 있는 패키지부터 스캔을 하는 것.
+        basePackageClasses = AutoAppConfig.class,
+
+        //기존의 AppConfig.java와 충돌이 날까봐 스캔을 제외하는 코드
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.ANNOTATION, classes = Configuration.class))
+public class AutoAppConfig {
+}
+// AutoAppConfig.java
+
+
+@Component
+public class MemberServiceImpl implements MemberService {
+
+    private final MemberRepository memberRepository;
+
+    @Autowired
+    public MemberServiceImpl(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
+    }
+}
+
+
+@Component
+public class MemoryMemberRepository implements MemberRepository{
+
+@Component
+public class OrderServiceImpl implements OrderService{
+
+    private final MemberRepository memberRepository;
+    private final DiscountPolicy discountPolicy;
+
+    @Autowired
+    public OrderServiceImpl(MemberRepository memberRepository, DiscountPolicy discountPolicy) {
+        this.memberRepository = memberRepository;
+        this.discountPolicy = discountPolicy;
+    }
+}
+
+
+@Component
+public class RateDiscountPolicy implements DiscountPolicy{
+
+package hello.core.scan;
+
+import hello.core.AutoAppConfig;
+import hello.core.member.MemberService;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+import static org.assertj.core.api.Assertions.*;
+
+public class AutoAppConfigTest {
+
+    @Test
+    void basicScan(){
+        AnnotationConfigApplicationContext ac 
+                = new AnnotationConfigApplicationContext(AutoAppConfig.class);
+
+        MemberService memberService = ac.getBean(MemberService.class);
+
+        assertThat(memberService).isInstanceOf(MemberService.class);
+
+    }
+}
+//AutoAppConfigTest.java
+
+package hello.core.scan.filter;
+
+import java.lang.annotation.*;
+
+//@Component에 들어가서 있는 애노테이션 복사해오기
+//Target이 가장 중요. Type은 클래스 레벨에 붙는 것.
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+
+//이 애노테이션 붙은건 컴포넌트 스캔에 추가
+public @interface MyIncludeComponent {
+}
+//MyIncludeComponent.java
+
+package hello.core.scan.filter;
+
+import java.lang.annotation.*;
+
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+
+//이 애노테이션이 붙은건 컴포넌트 스캔에서 제외
+public @interface MyExcludeComponent {
+}
+//MyExcludeComponent.java
+
+package hello.core.scan.filter;
+
+@MyIncludeComponent
+public class BeanA {
+}
+//BeanA.java
+
+package hello.core.scan.filter;
+
+@MyExcludeComponent
+public class BeanB {
+}
+//BeanB.java
+
+package hello.core.scan.filter;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class ComponentFilterAppConfigTest {
+
+    @Configuration
+    @ComponentScan(
+            //타입이 ANNOTATION이 디폴트여서 생략도 가능.
+            includeFilters = @ComponentScan.Filter(classes = MyIncludeComponent.class),
+
+            excludeFilters = @ComponentScan.Filter(
+                    type = FilterType.ANNOTATION, classes = MyExcludeComponent.class)
+    )
+
+    static class ComponentAppConfig{
+    }
+
+    @Test
+    void filterScan(){
+        AnnotationConfigApplicationContext ac 
+                = new AnnotationConfigApplicationContext(ComponentAppConfig.class);
+
+        //beanA는 Null이면 안되고 조회가 되어야 함.
+        BeanA beanA = ac.getBean("beanA", BeanA.class);
+        assertThat(beanA).isNotNull();
+
+        //beanB는 조회가 되면 안되고 exception이 터져야함.
+        //BeanB beanB = ac.getBean("beanB", BeanB.class);
+        assertThrows(NoSuchBeanDefinitionException.class,
+                () -> ac.getBean("beanB", BeanB.class));
+
+    }
+}
+//ComponentFilterAppConfigTest.java
+
+public class AutoAppConfig {
+
+    //수동/자동 중복 등록 충돌을 확인하기 위한 코드
+    @Bean(name="memoryMemberRepository")
+    MemberRepository memberRepository(){
+        return new MemoryMemberRepository();
+    }
+}
+//AutoAppConfig.java
+
