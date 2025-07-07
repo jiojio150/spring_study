@@ -1,0 +1,269 @@
+package hello.core.discount;
+
+import hello.core.member.Grade;
+import hello.core.member.Member;
+
+public class RateDiscountPolicy implements DiscountPolicy{
+
+    private int discountPercent = 10;
+
+    @Override
+    public int discount(Member member, int price) {
+
+        if(member.getGrade() == Grade.VIP){
+            return price * discountPercent / 100;
+        }else{
+            return 0;
+        }
+    }
+}
+// RateDiscountPolicy.java
+
+package hello.core.discount;
+
+import hello.core.member.Grade;
+import hello.core.member.Member;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.*;
+
+class RateDiscountPolicyTest {
+
+    RateDiscountPolicy discountPolicy = new RateDiscountPolicy();
+
+    @Test
+    //JUnit5는 해당 태그를 통해서 한글로 이름을 쓸 수가 있음. (JUnit5부터 지원함)
+    @DisplayName("VIP는 10% 할인이 적용되어야 한다.")
+    void vip_o(){
+        
+        //given
+        Member member = new Member(1L, "memberVIP", Grade.VIP);
+        
+        //when
+        int discount = discountPolicy.discount(member, 10000);
+
+        //then
+        assertThat(discount).isEqualTo(1000);
+    }
+
+    @Test
+    @DisplayName("VIP가 아니면 할인이 적용되지 않아야 한다.")
+    void vip_x(){
+
+        //given
+        Member member = new Member(2L, "memberBASIC", Grade.BASIC);
+
+        //when
+        int discount = discountPolicy.discount(member, 10000);
+
+        //then
+        assertThat(discount).isEqualTo(0);
+    }
+
+}
+// RateDiscountPolicyTest.java
+
+package hello.core.order;
+
+import hello.core.discount.DiscountPolicy;
+import hello.core.discount.FixDiscountPolicy;
+import hello.core.discount.RateDiscountPolicy;
+import hello.core.member.Member;
+import hello.core.member.MemberRepository;
+import hello.core.member.MemoryMemberRepository;
+
+public class OrderServiceImpl implements OrderService{
+
+    private final MemberRepository memberRepository = new MemoryMemberRepository();
+    //private final DiscountPolicy discountPolicy = new FixDiscountPolicy();
+    private final DiscountPolicy discountPolicy = new RateDiscountPolicy();
+
+
+    public OrderServiceImpl(MemberRepository memberRepository, DiscountPolicy discountPolicy) {
+        this.memberRepository = memberRepository;
+        this.discountPolicy = discountPolicy;
+    }
+
+    @Override
+    public Order createOrder(Long memberId, String itemName, int itemPrice) {
+
+        Member member = memberRepository.findById(memberId);
+        int discountPrice = discountPolicy.discount(member, itemPrice);
+
+        return new Order(memberId, itemName, itemPrice, discountPrice);
+    }
+}
+// OrderServiceImple.java
+
+//기존 코드
+private final MemberRepository memberRepository = new MemoryMemberRepository();
+private final DiscountPolicy discountPolicy = new FixDiscountPolicy();
+private final DiscountPolicy discountPolicy = new RateDiscountPolicy();
+
+//변경된 코드
+private final MemberRepository memberRepository;
+private final DiscountPolicy discountPolicy;
+
+public OrderServiceImpl(MemberRepository memberRepository, DiscountPolicy discountPolicy) {
+        this.memberRepository = memberRepository;
+        this.discountPolicy = discountPolicy;
+    }
+
+//리펙터링 전 코드
+package hello.core;
+import hello.core.discount.FixDiscountPolicy;
+import hello.core.member.MemberService;
+import hello.core.member.MemberServiceImpl;
+import hello.core.member.MemoryMemberRepository;
+import hello.core.order.OrderService;
+import hello.core.order.OrderServiceImpl;
+
+public class AppConfig {
+ public MemberService memberService() {
+ return new MemberServiceImpl(new MemoryMemberRepository());
+ }
+ public OrderService orderService() {
+ return new OrderServiceImpl(
+ new MemoryMemberRepository(),
+ new FixDiscountPolicy());
+ }
+
+  package hello.core;
+
+import hello.core.discount.DiscountPolicy;
+import hello.core.discount.RateDiscountPolicy;
+import hello.core.member.MemberRepository;
+import hello.core.member.MemberService;
+import hello.core.member.MemberServiceImpl;
+import hello.core.member.MemoryMemberRepository;
+import hello.core.order.OrderService;
+import hello.core.order.OrderServiceImpl;
+
+
+public class AppConfig {
+
+    public MemberService memberService(){
+        return new MemberServiceImpl(memberRepository());
+    }
+
+    public MemberRepository memberRepository() {
+        return new MemoryMemberRepository();
+    }
+
+    public OrderService orderService(){
+        return new OrderServiceImpl(memberRepository(), discountPolicy());
+    }
+
+    public DiscountPolicy discountPolicy(){
+        //return new FixDiscountPolicy();
+        return new RateDiscountPolicy();
+    }
+}
+
+
+  package hello.core;
+
+import hello.core.discount.DiscountPolicy;
+import hello.core.discount.RateDiscountPolicy;
+import hello.core.member.MemberRepository;
+import hello.core.member.MemberService;
+import hello.core.member.MemberServiceImpl;
+import hello.core.member.MemoryMemberRepository;
+import hello.core.order.OrderService;
+import hello.core.order.OrderServiceImpl;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+//스프링 연동을 위해 필요
+@Configuration
+public class AppConfig {
+    @Bean
+    public MemberService memberService(){
+        return new MemberServiceImpl(memberRepository());
+    }
+
+    @Bean
+    public MemberRepository memberRepository() {
+        return new MemoryMemberRepository();
+    }
+
+    @Bean
+    public OrderService orderService(){
+        return new OrderServiceImpl(memberRepository(), discountPolicy());
+    }
+
+    @Bean
+    public DiscountPolicy discountPolicy(){
+        //return new FixDiscountPolicy();
+        return new RateDiscountPolicy();
+    }
+}
+// AppConfig.java(spring)
+
+package hello.core;
+
+import hello.core.member.Grade;
+import hello.core.member.Member;
+import hello.core.member.MemberService;
+import hello.core.member.MemberServiceImpl;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class MemberApp {
+
+    public static void main(String[] args) {
+
+        //AppConfig에 있는 환경 설정 정보를 가지고 의존 관계를 주입해줌.
+        ApplicationContext applicationContext =
+                new AnnotationConfigApplicationContext(AppConfig.class);
+
+        //AppConfig에서 타입이 MemberService인 memberService를 찾음.
+        MemberService memberService = 
+                applicationContext.getBean("memberService", MemberService.class);
+
+        Member member = new Member(1L, "memberA", Grade.VIP);
+        memberService.join(member);
+
+        Member findMember = memberService.findMember(1L);
+
+        System.out.println("newMember : " + member.getName());
+        System.out.println("findMember : " + findMember.getName());
+    }
+}
+//MemberApp.java(spring)
+
+package hello.core;
+
+import hello.core.member.Grade;
+import hello.core.member.Member;
+import hello.core.member.MemberService;
+import hello.core.order.Order;
+import hello.core.order.OrderService;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class OrderApp {
+
+    public static void main(String[] args) {
+        
+        ApplicationContext applicationContext 
+                = new AnnotationConfigApplicationContext(AppConfig.class);
+        
+        MemberService memberService 
+                = applicationContext.getBean("memberService", MemberService.class);
+        
+        OrderService orderService
+                = applicationContext.getBean("orderService", OrderService.class);
+
+        Long memberId = 1L;
+        Member member = new Member(memberId, "memberA", Grade.VIP);
+        memberService.join(member);
+
+        Order order = orderService.createOrder(memberId, "itemA", 50000);
+
+        System.out.println("order = " + order);
+
+    }
+}
+// OrderApp.java(spring)
